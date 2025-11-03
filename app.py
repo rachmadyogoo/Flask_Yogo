@@ -14,9 +14,11 @@ with open('model.pkl', 'rb') as f:
 with open('scaler.pkl', 'rb') as f:
     scaler = pickle.load(f)
 
+
 @app.route('/prediksi')
 def home():
     return render_template('index.html')
+
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -42,39 +44,47 @@ def predict():
     except Exception as e:
         return render_template('index.html', error=str(e))
 
+
 @app.route('/')
 def dashboard():
     return redirect('/dash/')
 
-dash_app = Dash(__name__, server=app, url_base_pathname='/dash/')
 
-df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminder_unfiltered.csv')
+# ========== DASH 1: MAIN DASHBOARD ==========
+def register_dash_main(server: Flask) -> Dash:
+    dash_app = Dash(__name__, server=server, routes_pathname_prefix='/dash/')
 
-dash_app.layout = html.Div([
-    html.H2('📊 Visualisasi Data Gapminder', style={'textAlign': 'center'}),
+    df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminder_unfiltered.csv')
 
-    html.Label('Pilih Negara:'),
-    dcc.Dropdown(
-        df.country.unique(),
-        'Indonesia',
-        id='dropdown-country',
-        style={'width': '50%'}
-    ),
-    dcc.Graph(id='line-chart'),
+    dash_app.layout = html.Div([
+        html.H2('📊 Visualisasi Data Gapminder', style={'textAlign': 'center'}),
 
-    html.Hr(),
-    html.P('Dashboard ini menampilkan perkembangan GDP per Kapita tiap negara dari dataset Gapminder.'),
-])
+        html.Label('Pilih Negara:'),
+        dcc.Dropdown(
+            df.country.unique(),
+            'Indonesia',
+            id='dropdown-country',
+            style={'width': '50%'}
+        ),
+        dcc.Graph(id='line-chart'),
 
-@dash_app.callback(
-    Output('line-chart', 'figure'),
-    Input('dropdown-country', 'value')
-)
-def update_graph(selected_country):
-    dff = df[df.country == selected_country]
-    fig = px.line(dff, x='year', y='gdpPercap', title=f'Perkembangan GDP per Kapita - {selected_country}')
-    return fig
+        html.Hr(),
+        html.P('Dashboard ini menampilkan perkembangan GDP per Kapita tiap negara dari dataset Gapminder.'),
+    ])
 
+    @dash_app.callback(
+        Output('line-chart', 'figure'),
+        Input('dropdown-country', 'value')
+    )
+    def update_graph(selected_country):
+        dff = df[df.country == selected_country]
+        fig = px.line(dff, x='year', y='gdpPercap', title=f'Perkembangan GDP per Kapita - {selected_country}')
+        return fig
+
+    return dash_app
+
+
+# ========== DASH 2: CONTROLS ==========
 def register_dash_controls(server: Flask) -> Dash:
     external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
     dash_app = Dash(
@@ -147,6 +157,8 @@ def register_dash_controls(server: Flask) -> Dash:
 
     return dash_app
 
+
+# ========== DASH 3: UNFILTERED ==========
 def register_dash_unfiltered(server: Flask) -> Dash:
     dash_app = Dash(
         __name__,
@@ -176,6 +188,8 @@ def register_dash_unfiltered(server: Flask) -> Dash:
 
     return dash_app
 
+
+# ========== FLASK ROUTES LAIN ==========
 @app.route("/hello/<name>")
 def hello_there(name):
     now = datetime.now()
@@ -189,22 +203,18 @@ def hello_there(name):
 
 @app.route("/pyramid/<height>")
 def pyramid(height):
-    """
-    Fungsi untuk membuat pyramid dengan tanda *.
-    """
     height = int(height)
     pyramid = ""
-
     for i in range(height):
         pyramid += " " * (height - i - 1)
         pyramid += "* " * (2 * i + 1)
         pyramid += "<br>"
-
     return pyramid
 
+
+# ========== MAIN ==========
 if __name__ == '__main__':
-    # Daftarkan semua Dash Apps tambahan
+    register_dash_main(app)
     register_dash_controls(app)
     register_dash_unfiltered(app)
-
     app.run(debug=True)
